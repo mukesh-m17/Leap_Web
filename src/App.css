@@ -3779,3 +3779,486 @@ body,
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* ==============================
+   PROFILE, LOGIN & LOGOUT
+============================== */
+
+.profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 6px 12px 6px 6px;
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.profile-chip:hover {
+  background: var(--cyan-dim);
+  border-color: var(--border-active);
+  transform: translateY(-2px);
+}
+
+.profile-avatar,
+.mobile-profile-avatar,
+.account-big-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--cyan), var(--green));
+  color: #001018;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  box-shadow: 0 0 20px var(--cyan-glow);
+  flex-shrink: 0;
+}
+
+.profile-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+
+.profile-chip-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.profile-chip-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-chip-role {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Mobile profile card */
+.mobile-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.mobile-profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  font-size: 1rem;
+}
+
+.mobile-profile-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.mobile-profile-email {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.mobile-footer-btn.logout:hover {
+  background: var(--red-dim);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Modal overlay */
+.account-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(6, 10, 16, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: accountOverlayIn 0.25s ease;
+}
+
+.account-modal-overlay.force-login {
+  z-index: 25000;
+}
+
+@keyframes accountOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal card */
+.account-modal {
+  width: min(94vw, 460px);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glow);
+  padding: 32px;
+  position: relative;
+  animation: accountModalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes accountModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+
+.account-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-size: 1rem;
+}
+
+.account-modal-close:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-dim);
+}
+
+.account-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-right: 40px;
+}
+
+.account-big-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  font-size: 1.4rem;
+}
+
+.account-modal h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.account-modal p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Forms */
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-form-group label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.account-form-group input,
+.account-form-group select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  transition: all var(--transition-base);
+}
+
+.account-form-group input:focus,
+.account-form-group select:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-dim);
+}
+
+/* Modal buttons */
+.account-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.account-primary-btn,
+.account-secondary-btn,
+.account-danger-btn {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 22px;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.account-primary-btn {
+  background: var(--cyan);
+  color: #001018;
+  box-shadow: 0 0 22px var(--cyan-glow);
+}
+
+.account-primary-btn:hover {
+  background: var(--cyan-light);
+  transform: translateY(-2px);
+}
+
+.account-secondary-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.account-secondary-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+}
+
+.account-danger-btn {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 0 22px var(--red-glow);
+}
+
+.account-danger-btn:hover {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+
+.account-primary-btn.full,
+.account-secondary-btn.full {
+  width: 100%;
+}
+
+/* Logout modal */
+.logout-modal {
+  text-align: center;
+  max-width: 400px;
+}
+
+.logout-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 20px var(--red-glow));
+}
+
+.logout-modal h2 {
+  margin-bottom: 8px;
+}
+
+.logout-modal .account-modal-actions {
+  justify-content: center;
+  margin-top: 26px;
+}
+
+/* Login modal */
+.login-modal {
+  max-width: 420px;
+  text-align: center;
+}
+
+.login-logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--cyan), var(--green));
+  color: #001018;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  box-shadow: 0 0 36px var(--cyan-glow);
+}
+
+.login-modal h2 {
+  margin-bottom: 8px;
+}
+
+.login-modal > p {
+  margin-bottom: 24px;
+}
+
+.login-note {
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem !important;
+  color: var(--text-muted) !important;
+}
+
+/* Light theme support */
+[data-theme="light"] .account-modal {
+  background: #ffffff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="light"] .account-form-group input,
+[data-theme="light"] .account-form-group select {
+  background: #f8fafc;
+}
+
+[data-theme="light"] .account-modal-overlay {
+  background: rgba(240, 244, 248, 0.82);
+}
+
+/* Mobile responsive */
+@media (max-width: 900px) {
+  .profile-chip {
+    display: none;
+  }
+
+  .logout-nav-btn {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .account-modal-overlay {
+    padding: 16px;
+    align-items: flex-end;
+  }
+
+  .account-modal {
+    width: 100%;
+    padding: 26px 20px;
+    border-radius: 24px 24px 18px 18px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  .account-modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-right: 36px;
+    gap: 12px;
+  }
+
+  .account-big-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    font-size: 1.2rem;
+  }
+
+  .account-modal h2 {
+    font-size: 1.25rem;
+  }
+
+  .account-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .account-primary-btn,
+  .account-secondary-btn,
+  .account-danger-btn {
+    width: 100%;
+  }
+
+  .logout-modal .account-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .mobile-profile-card {
+    padding: 14px;
+  }
+
+  .mobile-profile-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .mobile-profile-name {
+    font-size: 0.95rem;
+  }
+
+  .mobile-profile-email {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .account-modal {
+    padding: 22px 16px;
+  }
+
+  .login-logo {
+    width: 60px;
+    height: 60px;
+    border-radius: 20px;
+    font-size: 1.6rem;
+  }
+
+  .account-form-group input,
+  .account-form-group select {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+  }
+}
