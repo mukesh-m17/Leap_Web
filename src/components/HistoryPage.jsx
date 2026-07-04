@@ -1,85 +1,45 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-export default function HistoryPage() {
+export default function HistoryPage({ history = [] }) {
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Sample data - in real app, this would come from props or API
-  const [historyData, setHistoryData] = useState([
-    {
-      id: 1,
-      timestamp: "2024-01-15 14:32:15",
-      level: 450,
-      status: "danger",
-      event: "Critical gas leak detected",
-    },
-    {
-      id: 2,
-      timestamp: "2024-01-15 12:15:42",
-      level: 320,
-      status: "warning",
-      event: "Elevated gas concentration",
-    },
-    {
-      id: 3,
-      timestamp: "2024-01-15 09:22:08",
-      level: 180,
-      status: "safe",
-      event: "Normal operation resumed",
-    },
-    {
-      id: 4,
-      timestamp: "2024-01-14 18:45:33",
-      level: 350,
-      status: "warning",
-      event: "Warning threshold exceeded",
-    },
-    {
-      id: 5,
-      timestamp: "2024-01-14 15:12:56",
-      level: 420,
-      status: "danger",
-      event: "Emergency protocol activated",
-    },
-    {
-      id: 6,
-      timestamp: "2024-01-14 12:08:21",
-      level: 250,
-      status: "safe",
-      event: "Gas levels normal",
-    },
-    {
-      id: 7,
-      timestamp: "2024-01-14 09:45:10",
-      level: 310,
-      status: "warning",
-      event: "Slight increase detected",
-    },
-    {
-      id: 8,
-      timestamp: "2024-01-13 16:30:45",
-      level: 480,
-      status: "danger",
-      event: "Critical alert - immediate action required",
-    },
-    {
-      id: 9,
-      timestamp: "2024-01-13 14:20:33",
-      level: 200,
-      status: "safe",
-      event: "System functioning normally",
-    },
-    {
-      id: 10,
-      timestamp: "2024-01-13 11:15:22",
-      level: 340,
-      status: "warning",
-      event: "Gas concentration rising",
-    },
-  ]);
+  // Convert history data to events
+  const [historyData, setHistoryData] = useState([]);
+
+  useEffect(() => {
+    if (history.length > 0) {
+      const events = history.map((level, index) => {
+        const timestamp = new Date(Date.now() - (history.length - index - 1) * 5000);
+        let status = "safe";
+        let event = "Normal operation";
+        
+        if (level > 400) {
+          status = "danger";
+          event = `Critical gas leak detected - ${level.toFixed(0)} ppm`;
+        } else if (level > 300) {
+          status = "warning";
+          event = `Elevated gas concentration - ${level.toFixed(0)} ppm`;
+        } else {
+          event = `Gas levels normal - ${level.toFixed(0)} ppm`;
+        }
+
+        return {
+          id: index + 1,
+          timestamp: timestamp.toLocaleString(),
+          level: level,
+          status: status,
+          event: event,
+          unread: index >= history.length - 3, // Last 3 are unread
+        };
+      }).reverse();
+
+      setHistoryData(events);
+    }
+  }, [history]);
 
   // Filter data
   const filteredData = historyData.filter((item) => {
@@ -107,7 +67,7 @@ export default function HistoryPage() {
 
   // Handle view details
   const handleView = (item) => {
-    alert(`Event Details:\n\nTimestamp: ${item.timestamp}\nGas Level: ${item.level} ppm\nStatus: ${item.status.toUpperCase()}\nEvent: ${item.event}`);
+    alert(`Event Details:\n\nTimestamp: ${item.timestamp}\nGas Level: ${item.level.toFixed(2)} ppm\nStatus: ${item.status.toUpperCase()}\nEvent: ${item.event}`);
   };
 
   // Handle export
@@ -136,7 +96,7 @@ export default function HistoryPage() {
       ["Timestamp", "Gas Level (ppm)", "Status", "Event"],
       ...filteredData.map((item) => [
         item.timestamp,
-        item.level,
+        item.level.toFixed(2),
         item.status,
         item.event,
       ]),
@@ -260,7 +220,7 @@ export default function HistoryPage() {
                     <td className="timestamp">{item.timestamp}</td>
                     <td className="gas-level">
                       <span className={`level-badge ${item.status}`}>
-                        {item.level} ppm
+                        {item.level.toFixed(0)} ppm
                       </span>
                     </td>
                     <td className="event-description">{item.event}</td>
