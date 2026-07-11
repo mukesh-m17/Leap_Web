@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Line } from "react-chartjs-2";
+
 
 export default function ReportsPage({ history = [], gas = 0, status = "safe" }) {
   const [reportType, setReportType] = useState("daily");
