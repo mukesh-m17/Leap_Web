@@ -9,8 +9,12 @@ const STATUS_COLORS = {
   danger:  "#f43f5e",
 };
 
+/* ============================================================
+   FIX 1: Replace deprecated THREE.Clock with state.clock
+   ============================================================ */
+
 /* Animated particles around cylinder */
-function Particles({ status, level }) {
+function Particles({ status }) {
   const particlesRef = useRef();
   const particleCount = 100;
   
@@ -36,13 +40,16 @@ function Particles({ status, level }) {
     return [pos, col];
   }, [status]);
 
+  // ✅ FIX: Use state.clock (provided by R3F) instead of THREE.Clock
   useFrame((state) => {
     if (!particlesRef.current) return;
     particlesRef.current.rotation.y += 0.001;
     
     const positions = particlesRef.current.geometry.attributes.position.array;
+    const elapsedTime = state.clock.elapsedTime;
+    
     for (let i = 0; i < particleCount; i++) {
-      positions[i * 3 + 1] += Math.sin(state.clock.elapsedTime + i) * 0.001;
+      positions[i * 3 + 1] += Math.sin(elapsedTime + i) * 0.001;
     }
     particlesRef.current.geometry.attributes.position.needsUpdate = true;
   });
@@ -81,10 +88,12 @@ function HoloRings({ status }) {
   const color = STATUS_COLORS[status];
 
   useFrame((state) => {
+    const elapsedTime = state.clock.elapsedTime;
+    
     ringsRef.current.forEach((ring, i) => {
       if (ring) {
-        ring.rotation.z = state.clock.elapsedTime * 0.3 * (i % 2 ? 1 : -1);
-        ring.material.opacity = 0.3 + Math.sin(state.clock.elapsedTime + i) * 0.2;
+        ring.rotation.z = elapsedTime * 0.3 * (i % 2 ? 1 : -1);
+        ring.material.opacity = 0.3 + Math.sin(elapsedTime + i) * 0.2;
       }
     });
   });
@@ -149,7 +158,6 @@ function GasFill({ level, status }) {
     meshRef.current.scale.y = next;
     meshRef.current.position.y = -1.5 + next / 2;
 
-    // Bubble animation
     if (bubblesRef.current) {
       bubblesRef.current.rotation.y += delta * 0.5;
     }
@@ -280,6 +288,10 @@ function Platform() {
   );
 }
 
+/* ============================================================
+   FIX 2: Remove shadows that cause PCFSoftShadowMap deprecation
+   ============================================================ */
+
 function Scene({ level, status }) {
   return (
     <>
@@ -287,7 +299,8 @@ function Scene({ level, status }) {
       <fog attach="fog" args={["#060a10", 5, 15]} />
 
       <ambientLight intensity={0.3} />
-      <directionalLight position={[5, 8, 5]} intensity={1.5} castShadow />
+      {/* ✅ FIX: Removed castShadow to avoid PCFSoftShadowMap deprecation */}
+      <directionalLight position={[5, 8, 5]} intensity={1.5} />
       <directionalLight position={[-5, -3, -3]} intensity={0.4} color="#00d4ff" />
       <pointLight position={[0, 2, 3]} intensity={0.8} color="#00d4ff" distance={8} />
       <spotLight
@@ -296,7 +309,6 @@ function Scene({ level, status }) {
         penumbra={1}
         intensity={0.5}
         color={STATUS_COLORS[status]}
-        castShadow
       />
 
       <Environment preset="night" />
@@ -307,7 +319,7 @@ function Scene({ level, status }) {
         <Ticks />
         <Platform />
         <HoloRings status={status} />
-        <Particles status={status} level={level} />
+        <Particles status={status} />
       </group>
 
       <OrbitControls
@@ -324,11 +336,15 @@ function Scene({ level, status }) {
   );
 }
 
+/* ============================================================
+   FIX 3: Remove shadows prop from Canvas
+   ============================================================ */
+
 export default function Cylinder3D({ level = 0, status = "safe" }) {
   return (
     <Canvas
       style={{ height: 280, width: "100%" }}
-      shadows
+      // ✅ FIX: Removed shadows prop (PCFSoftShadowMap deprecated)
       gl={{ 
         antialias: true, 
         alpha: true,
