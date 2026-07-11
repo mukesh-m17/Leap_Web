@@ -21,7 +21,7 @@ function getGasStatus(value) {
   return "safe";
 }
 
-function getWeightStatus(weight, maxWeight = 14.2) {
+function getWeightStatus(weight) {
   if (weight <= 0.05) return "empty";
   if (weight <= 0.6) return "exhausted";
   if (weight <= 2.0) return "low";
@@ -30,7 +30,7 @@ function getWeightStatus(weight, maxWeight = 14.2) {
 }
 
 function getStatusLabel(status) {
-  switch(status) {
+  switch (status) {
     case "danger": return "CRITICAL";
     case "warning": return "ELEVATED";
     default: return "SAFE";
@@ -39,7 +39,7 @@ function getStatusLabel(status) {
 
 export default function GasDashboard() {
   const [currentPage, setCurrentPage] = useState("dashboard");
-  
+
   // Real-time Firebase Data
   const [gasValue, setGasValue] = useState(0);
   const [cylinderWeight, setCylinderWeight] = useState(0);
@@ -47,12 +47,12 @@ export default function GasDashboard() {
   const [cylinderStatus, setCylinderStatus] = useState("");
   const [relayStatus, setRelayStatus] = useState("OFF");
   const [buzzerStatus, setBuzzerStatus] = useState("OFF");
-  const [systemStatus, setSystemStatus] = useState("RUNNING");
-  
+  // ✅ REMOVED: systemStatus state (was unused)
+
   // History Arrays
   const [gasHistory, setGasHistory] = useState([]);
   const [weightHistory, setWeightHistory] = useState([]);
-  
+
   // UI States
   const [popup, setPopup] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -60,161 +60,227 @@ export default function GasDashboard() {
   const [isConnected, setIsConnected] = useState(true);
   const [gasTrend, setGasTrend] = useState(0);
   const [weightTrend, setWeightTrend] = useState(0);
+  const [currentTab, setCurrentTab] = useState("gas");
 
+  // Refs
   const previousGasRef = useRef(0);
   const previousWeightRef = useRef(0);
-  const [currentTab, setCurrentTab] = useState('gas');
 
+  // Add notification helper
   const addNotification = useCallback((message, type = "info") => {
     const id = Date.now();
-    setNotifications(prev => [...prev, { id, message, type }]);
+    setNotifications((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
     }, 5000);
   }, []);
 
   // Firebase Real-time Listener
   useEffect(() => {
     const deviceRef = ref(database, DEVICE_PATH);
-    
-    const unsubscribe = onValue(deviceRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        
-        const newGasValue = data.gasValue || 0;
-        const newWeight = data.weight || 0;
-        const leak = data.gasLeak || false;
-        
-        // Update states
-        setGasValue(newGasValue);
-        setCylinderWeight(newWeight);
-        setGasLeak(leak);
-        setCylinderStatus(data.cylinderStatus || "UNKNOWN");
-        setRelayStatus(data.relayStatus || "OFF");
-        setBuzzerStatus(data.buzzerStatus || "OFF");
-        setSystemStatus(data.systemStatus || "RUNNING");
-        setLastUpdate(new Date());
-        setIsConnected(true);
 
-        // Update history
-        setGasHistory(prev => {
-          const updated = [...prev, newGasValue];
-          return updated.slice(-50); // Keep last 50 readings
-        });
+    const unsubscribe = onValue(
+      deviceRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
 
-        setWeightHistory(prev => {
-          const updated = [...prev, newWeight];
-          return updated.slice(-50);
-        });
+          const newGasValue = data.gasValue || 0;
+          const newWeight = data.weight || 0;
+          const leak = data.gasLeak || false;
 
-        // Calculate trends
-        if (previousGasRef.current > 0) {
-          const change = ((newGasValue - previousGasRef.current) / Math.max(previousGasRef.current, 1)) * 100;
-          setGasTrend(change);
+          // Update states
+          setGasValue(newGasValue);
+          setCylinderWeight(newWeight);
+          setGasLeak(leak);
+          setCylinderStatus(data.cylinderStatus || "UNKNOWN");
+          setRelayStatus(data.relayStatus || "OFF");
+          setBuzzerStatus(data.buzzerStatus || "OFF");
+          // ✅ REMOVED: setSystemStatus (was unused)
+          setLastUpdate(new Date());
+          setIsConnected(true);
+
+          // Update history (keep last 50 readings)
+          setGasHistory((prev) => {
+            const updated = [...prev, newGasValue];
+            return updated.slice(-50);
+          });
+
+          setWeightHistory((prev) => {
+            const updated = [...prev, newWeight];
+            return updated.slice(-50);
+          });
+
+          // Calculate trends
+          if (previousGasRef.current > 0) {
+            const change =
+              ((newGasValue - previousGasRef.current) /
+                Math.max(previousGasRef.current, 1)) *
+              100;
+            setGasTrend(change);
+          }
+
+          if (previousWeightRef.current > 0) {
+            const wChange =
+              ((newWeight - previousWeightRef.current) /
+                Math.max(previousWeightRef.current, 1)) *
+              100;
+            setWeightTrend(wChange);
+          }
+
+          // GAS ALERTS
+          if (leak && previousGasRef.current < 1500) {
+            setPopup("leak");
+            addNotification("🚨 CRITICAL: Gas leakage detected!", "danger");
+          } else if (!leak && previousGasRef.current >= 1500) {
+            addNotification("✓ Gas leak stopped", "success");
+            setPopup(null);
+          } else if (newGasValue > 1000 && previousGasRef.current <= 1000) {
+            setPopup("high");
+            addNotification("⚠️ WARNING: High gas concentration", "warning");
+          }
+
+          // WEIGHT ALERTS
+          const weightStatus = getWeightStatus(newWeight);
+          const prevWeightStatus = getWeightStatus(previousWeightRef.current);
+
+          if (weightStatus === "empty" && prevWeightStatus !== "empty") {
+            addNotification("❌ No cylinder detected", "warning");
+          } else if (
+            weightStatus === "exhausted" &&
+            prevWeightStatus !== "exhausted"
+          ) {
+            addNotification("🛑 LPG Exhausted - Refill immediately!", "danger");
+          } else if (weightStatus === "low" && prevWeightStatus !== "low") {
+            addNotification("⚠️ Low LPG - Please refill soon", "warning");
+          } else if (weightStatus === "full" && prevWeightStatus === "low") {
+            addNotification("✅ Cylinder refilled successfully", "success");
+          }
+
+          previousGasRef.current = newGasValue;
+          previousWeightRef.current = newWeight;
+        } else {
+          setIsConnected(false);
+          setPopup("offline");
+          addNotification("❌ Device offline - check connection", "error");
         }
-
-        if (previousWeightRef.current > 0) {
-          const wChange = ((newWeight - previousWeightRef.current) / Math.max(previousWeightRef.current, 1)) * 100;
-          setWeightTrend(wChange);
-        }
-
-        // GAS ALERTS
-        if (leak && previousGasRef.current < 1500) {
-          setPopup("leak");
-          addNotification("🚨 CRITICAL: Gas leakage detected!", "danger");
-        } else if (!leak && previousGasRef.current >= 1500) {
-          addNotification("✓ Gas leak stopped", "success");
-          setPopup(null);
-        } else if (newGasValue > 1000 && previousGasRef.current <= 1000) {
-          setPopup("high");
-          addNotification("⚠️ WARNING: High gas concentration", "warning");
-        }
-
-        // WEIGHT ALERTS
-        const weightStatus = getWeightStatus(newWeight);
-        const prevWeightStatus = getWeightStatus(previousWeightRef.current);
-
-        if (weightStatus === "empty" && prevWeightStatus !== "empty") {
-          addNotification("❌ No cylinder detected", "warning");
-        } else if (weightStatus === "exhausted" && prevWeightStatus !== "exhausted") {
-          addNotification("🛑 LPG Exhausted - Refill immediately!", "danger");
-        } else if (weightStatus === "low" && prevWeightStatus !== "low") {
-          addNotification("⚠️ Low LPG - Please refill soon", "warning");
-        } else if (weightStatus === "full" && prevWeightStatus === "low") {
-          addNotification("✅ Cylinder refilled successfully", "success");
-        }
-
-        previousGasRef.current = newGasValue;
-        previousWeightRef.current = newWeight;
-
-      } else {
+      },
+      (error) => {
+        console.error("Firebase error:", error);
         setIsConnected(false);
-        setPopup("offline");
-        addNotification("❌ Device offline - check connection", "error");
+        addNotification("❌ Connection error", "error");
       }
-    }, (error) => {
-      console.error("Firebase error:", error);
-      setIsConnected(false);
-      addNotification("❌ Connection error", "error");
-    });
+    );
 
     return () => unsubscribe();
   }, [addNotification]);
 
+  // Calculated Values
   const gasStatus = getGasStatus(gasValue);
   const weightStatus = getWeightStatus(cylinderWeight);
-  
-  const maxGas = gasHistory.length ? Math.max(...gasHistory) : 0;
-  const avgGas = gasHistory.length ? (gasHistory.reduce((a,b)=>a+b,0)/gasHistory.length).toFixed(1) : 0;
-  
-  const MAX_WEIGHT = 14.2;
-  const fillPercentage = Math.min((cylinderWeight / MAX_WEIGHT) * 100, 100).toFixed(1);
-  const remainingWeight = Math.max(MAX_WEIGHT - cylinderWeight, 0).toFixed(1);
-  
-  const timeStr = lastUpdate?.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) || "--:--:--";
-  const dateStr = lastUpdate?.toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'}) || "--/--/----";
 
+  const maxGas = gasHistory.length ? Math.max(...gasHistory) : 0;
+  const avgGas = gasHistory.length
+    ? (gasHistory.reduce((a, b) => a + b, 0) / gasHistory.length).toFixed(1)
+    : 0;
+
+  const MAX_WEIGHT = 14.2;
+  const fillPercentage = Math.min(
+    (cylinderWeight / MAX_WEIGHT) * 100,
+    100
+  ).toFixed(1);
+  const remainingWeight = Math.max(MAX_WEIGHT - cylinderWeight, 0).toFixed(1);
+
+  const timeStr =
+    lastUpdate?.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }) || "--:--:--";
+  const dateStr =
+    lastUpdate?.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }) || "--/--/----";
+
+  // Page Router
   const renderPage = () => {
-    switch(currentPage) {
-      case "analytics": 
-        return <AnalyticsPage history={gasHistory} gas={gasValue} status={gasStatus} />;
+    switch (currentPage) {
+      case "analytics":
+        return (
+          <AnalyticsPage
+            history={gasHistory}
+            gas={gasValue}
+            status={gasStatus}
+          />
+        );
       case "history":
-        return <HistoryPage history={gasHistory} weightHistory={weightHistory} />;
-      case "settings": 
+        return (
+          <HistoryPage history={gasHistory} weightHistory={weightHistory} />
+        );
+      case "settings":
         return <SettingsPage />;
-      case "alerts": 
+      case "alerts":
         return <AlertsPage />;
-      case "reports": 
-        return <ReportsPage history={gasHistory} gas={gasValue} status={gasStatus} />;
+      case "reports":
+        return (
+          <ReportsPage
+            history={gasHistory}
+            gas={gasValue}
+            status={gasStatus}
+          />
+        );
       default:
         return (
           <>
+            {/* Background Effects */}
             <div className="dashboard-bg-grid"></div>
             <div className="dashboard-particles">
               {[...Array(20)].map((_, i) => (
-                <div key={i} className="particle" style={{
-                  left: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 5}s`,
-                  animationDuration: `${10 + Math.random() * 10}s`
-                }}></div>
+                <div
+                  key={i}
+                  className="particle"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    animationDelay: `${Math.random() * 5}s`,
+                    animationDuration: `${10 + Math.random() * 10}s`,
+                  }}
+                ></div>
               ))}
             </div>
 
+            {/* Header */}
             <div className="dashboard-header">
               <div className="header-left">
-                <div className="header-badge"><span className="header-badge-dot"></span>IoT MONITORING SYSTEM v2.0</div>
-                <h1>Smart LPG<br/><span className="gradient-text">Cylinder Monitor</span></h1>
-                <p className="header-subtitle">Real-time Gas Detection & Weight Analysis</p>
+                <div className="header-badge">
+                  <span className="header-badge-dot"></span>
+                  IoT MONITORING SYSTEM v2.0
+                </div>
+                <h1>
+                  Smart LPG
+                  <br />
+                  <span className="gradient-text">Cylinder Monitor</span>
+                </h1>
+                <p className="header-subtitle">
+                  Real-time Gas Detection & Weight Analysis
+                </p>
               </div>
-              
+
               <div className="header-right">
-                <div className={`connection-status ${isConnected ? 'online' : 'offline'}`}>
+                <div
+                  className={`connection-status ${
+                    isConnected ? "online" : "offline"
+                  }`}
+                >
                   <div className="status-indicator">
-                    <span className={`status-dot`}></span>
+                    <span className="status-dot"></span>
                     <span className="status-pulse"></span>
                   </div>
                   <div className="status-info">
-                    <span className="status-label">{isConnected ? "LIVE" : "OFFLINE"}</span>
+                    <span className="status-label">
+                      {isConnected ? "LIVE" : "OFFLINE"}
+                    </span>
                     <span className="status-time">{timeStr}</span>
                     <span className="status-date">{dateStr}</span>
                   </div>
@@ -222,61 +288,107 @@ export default function GasDashboard() {
               </div>
             </div>
 
+            {/* MAIN GRID - DUAL MONITOR LAYOUT */}
             <div className="dual-monitor-grid">
-              
-              {/* GAS MONITORING */}
+              {/* LEFT COLUMN: GAS MONITORING */}
               <div className="monitor-section gas-monitor">
                 <div className="section-header gas-header">
-                  <h3><span className="section-icon">🔬</span> Gas Concentration Monitor (MQ6)</h3>
-                  <span className={`live-badge ${gasStatus}`}>{gasStatus.toUpperCase()}</span>
+                  <h3>
+                    <span className="section-icon">🔬</span> Gas Concentration
+                    Monitor (MQ6)
+                  </h3>
+                  <span className={`live-badge ${gasStatus}`}>
+                    {gasStatus.toUpperCase()}
+                  </span>
                 </div>
 
                 <div className="monitor-content">
+                  {/* Big Number Display */}
                   <div className="primary-display gas-primary">
                     <div className="display-value-container">
                       <span className="display-number">{gasValue}</span>
                       <span className="display-unit">ADC</span>
                     </div>
-                    
+
                     <div className="display-meta">
                       {gasTrend !== 0 && (
-                        <span className={`trend-indicator ${gasTrend > 0 ? 'up' : 'down'}`}>
-                          {gasTrend > 0 ? '▲' : '▼'} {Math.abs(gasTrend).toFixed(1)}%
+                        <span
+                          className={`trend-indicator ${
+                            gasTrend > 0 ? "up" : "down"
+                          }`}
+                        >
+                          {gasTrend > 0 ? "▲" : "▼"}{" "}
+                          {Math.abs(gasTrend).toFixed(1)}%
                         </span>
                       )}
                       <span className="update-time">Live</span>
                     </div>
                   </div>
 
+                  {/* Mini Chart */}
                   <div className="mini-chart-container">
                     <h4>Real-time Trend</h4>
                     <GasChart data={gasHistory.slice(-20)} status={gasStatus} />
                   </div>
 
+                  {/* Stats Row */}
                   <div className="quick-stats-row gas-stats">
-                    <StatusCard label="Max" value={maxGas} unit="ADC" icon="📈" />
-                    <StatusCard label="Average" value={avgGas} unit="ADC" icon="📊" />
-                    <StatusCard label="Status" value={getStatusLabel(gasStatus)} unit="" icon={gasLeak ? "🚨" : gasStatus === "warning" ? "⚠️" : "✅"} />
+                    <StatusCard
+                      label="Max"
+                      value={maxGas}
+                      unit="ADC"
+                      icon="📈"
+                    />
+                    <StatusCard
+                      label="Average"
+                      value={avgGas}
+                      unit="ADC"
+                      icon="📊"
+                    />
+                    <StatusCard
+                      label="Status"
+                      value={getStatusLabel(gasStatus)}
+                      unit=""
+                      icon={
+                        gasLeak ? "🚨" : gasStatus === "warning" ? "⚠️" : "✅"
+                      }
+                    />
                   </div>
 
+                  {/* Threshold Bar */}
                   <div className="threshold-wrapper">
                     <label>Gas Level</label>
                     <div className="custom-threshold-bar">
-                      <div className="threshold-fill bg-gas" style={{width: `${Math.min((gasValue/4095)*100, 100)}%`}}></div>
+                      <div
+                        className="threshold-fill bg-gas"
+                        style={{
+                          width: `${Math.min((gasValue / 4095) * 100, 100)}%`,
+                        }}
+                      ></div>
                       <div className="threshold-markers">
-                        <span style={{left: '24%'}}>Warning (1000)</span>
-                        <span style={{left: '37%', background: '#f43f5e'}}>Critical (1500)</span>
+                        <span style={{ left: "24%" }}>Warning (1000)</span>
+                        <span style={{ left: "37%", background: "#f43f5e" }}>
+                          Critical (1500)
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Device Status Indicators */}
                   <div className="device-status-row">
-                    <div className={`status-pill ${relayStatus === 'ON' ? 'active' : ''}`}>
+                    <div
+                      className={`status-pill ${
+                        relayStatus === "ON" ? "active" : ""
+                      }`}
+                    >
                       <span>🔌 Relay:</span>
                       <strong>{relayStatus}</strong>
                     </div>
-                    <div className={`status-pill ${buzzerStatus === 'ON' ? 'active' : ''}`}>
+                    <div
+                      className={`status-pill ${
+                        buzzerStatus === "ON" ? "active" : ""
+                      }`}
+                    >
                       <span>🔔 Buzzer:</span>
                       <strong>{buzzerStatus}</strong>
                     </div>
@@ -284,58 +396,103 @@ export default function GasDashboard() {
                 </div>
               </div>
 
-              {/* WEIGHT MONITOR */}
+              {/* RIGHT COLUMN: CYLINDER WEIGHT MONITOR */}
               <div className="monitor-section weight-monitor">
                 <div className="section-header weight-header">
-                  <h3><span className="section-icon">⚖️</span> Cylinder Weight (HX711)</h3>
+                  <h3>
+                    <span className="section-icon">⚖️</span> Cylinder Weight
+                    (HX711)
+                  </h3>
                   <span className={`fill-badge ${weightStatus}`}>
-                    {weightStatus === 'empty' ? '🔴 NO CYLINDER' :
-                     weightStatus === 'exhausted' ? '🛑 EXHAUSTED' :
-                     weightStatus === 'low' ? '🟠 LOW LPG' :
-                     weightStatus === 'full' ? '🟢 FULL' : '🟡 NORMAL'}
+                    {weightStatus === "empty"
+                      ? "🔴 NO CYLINDER"
+                      : weightStatus === "exhausted"
+                      ? "🛑 EXHAUSTED"
+                      : weightStatus === "low"
+                      ? "🟠 LOW LPG"
+                      : weightStatus === "full"
+                      ? "🟢 FULL"
+                      : "🟡 NORMAL"}
                   </span>
                 </div>
 
                 <div className="monitor-content">
+                  {/* 3D Cylinder Visualization */}
                   <div className="cylinder-viz-container">
-                    <Cylinder3D level={parseFloat(fillPercentage)} status={weightStatus === 'empty' ? 'danger' : 'safe'} />
+                    <Cylinder3D
+                      level={parseFloat(fillPercentage)}
+                      status={weightStatus === "empty" ? "danger" : "safe"}
+                    />
                     <div className="fill-percentage-overlay">
                       {fillPercentage}%
                     </div>
                   </div>
 
+                  {/* Weight Details */}
                   <div className="weight-details-panel">
                     <div className="weight-main-display">
                       <span className="weight-label">Current Weight</span>
-                      <span className="weight-value">{cylinderWeight.toFixed(2)}</span>
+                      <span className="weight-value">
+                        {cylinderWeight.toFixed(2)}
+                      </span>
                       <span className="weight-unit">kg</span>
                     </div>
 
                     {weightTrend !== 0 && (
-                      <div className={`weight-trend-badge ${Math.abs(weightTrend) > 5 ? 'significant' : ''}`}>
-                        {weightTrend > 0 ? '↑ Refilling' : '↓ Consuming'} ({Math.abs(weightTrend).toFixed(1)}%)
+                      <div
+                        className={`weight-trend-badge ${
+                          Math.abs(weightTrend) > 5 ? "significant" : ""
+                        }`}
+                      >
+                        {weightTrend > 0 ? "↑ Refilling" : "↓ Consuming"} (
+                        {Math.abs(weightTrend).toFixed(1)}%)
                       </div>
                     )}
 
                     <div className="capacity-bars">
                       <div className="cap-item">
                         <span>Current</span>
-                        <div className="bar-bg"><div className="bar-fill blue" style={{width:`${fillPercentage}%`}}></div></div>
+                        <div className="bar-bg">
+                          <div
+                            className="bar-fill blue"
+                            style={{ width: `${fillPercentage}%` }}
+                          ></div>
+                        </div>
                         <span>{cylinderWeight.toFixed(1)} kg</span>
                       </div>
                       <div className="cap-item">
                         <span>Used Space</span>
-                        <div className="bar-bg"><div className="bar-fill green" style={{width:`${fillPercentage}%`}}></div></div>
-                        <span>{(MAX_WEIGHT - parseFloat(remainingWeight)).toFixed(1)} kg</span>
+                        <div className="bar-bg">
+                          <div
+                            className="bar-fill green"
+                            style={{ width: `${fillPercentage}%` }}
+                          ></div>
+                        </div>
+                        <span>
+                          {(MAX_WEIGHT - parseFloat(remainingWeight)).toFixed(
+                            1
+                          )}{" "}
+                          kg
+                        </span>
                       </div>
                       <div className="cap-item">
                         <span>Remaining</span>
-                        <div className="bar-bg"><div className="bar-fill orange" style={{width:`${(remainingWeight/MAX_WEIGHT)*100}%`}}></div></div>
+                        <div className="bar-bg">
+                          <div
+                            className="bar-fill orange"
+                            style={{
+                              width: `${
+                                (remainingWeight / MAX_WEIGHT) * 100
+                              }%`,
+                            }}
+                          ></div>
+                        </div>
                         <span>{remainingWeight} kg</span>
                       </div>
                     </div>
                   </div>
 
+                  {/* Weight Alert Info */}
                   <div className="weight-alerts-info">
                     <div className={`alert-box ${weightStatus}`}>
                       {cylinderStatus}
@@ -345,17 +502,31 @@ export default function GasDashboard() {
               </div>
             </div>
 
-            {/* COMBINED CHART */}
+            {/* COMBINED CHART SECTION */}
             <div className="panel chart-panel-combined">
               <div className="panel-header">
                 <h3>Real-time Data Timeline</h3>
                 <div className="chart-toggle-group">
-                  <button className={`toggle-btn ${currentTab === 'gas' ? 'active' : ''}`} onClick={() => setCurrentTab('gas')}>Gas Levels</button>
-                  <button className={`toggle-btn ${currentTab === 'weight' ? 'active' : ''}`} onClick={() => setCurrentTab('weight')}>Weight</button>
+                  <button
+                    className={`toggle-btn ${
+                      currentTab === "gas" ? "active" : ""
+                    }`}
+                    onClick={() => setCurrentTab("gas")}
+                  >
+                    Gas Levels
+                  </button>
+                  <button
+                    className={`toggle-btn ${
+                      currentTab === "weight" ? "active" : ""
+                    }`}
+                    onClick={() => setCurrentTab("weight")}
+                  >
+                    Weight
+                  </button>
                 </div>
               </div>
               <div className="chart-area-full">
-                {currentTab === 'gas' ? (
+                {currentTab === "gas" ? (
                   <GasChart data={gasHistory} status={gasStatus} />
                 ) : (
                   <GasChart data={weightHistory} status="safe" />
@@ -374,7 +545,7 @@ export default function GasDashboard() {
                   <p>🔴 Critical: &gt;1500 ADC</p>
                 </div>
               </div>
-              
+
               <div className="panel info-card dual-card weight-info">
                 <div className="card-icon weight-icon">⛽</div>
                 <h4>Cylinder Capacity</h4>
@@ -395,7 +566,14 @@ export default function GasDashboard() {
               <div className="panel info-card dual-card system-info">
                 <div className="card-icon">⚙️</div>
                 <h4>System Status</h4>
-                <p dangerouslySetInnerHTML={{__html: `Status: ${isConnected ? '<span style="color:#10b981">ONLINE</span>' : '<span style="color:#f43f5e">OFFLINE</span>'}`}}></p>
+                <p>
+                  Status:{" "}
+                  {isConnected ? (
+                    <span style={{ color: "#10b981" }}>ONLINE</span>
+                  ) : (
+                    <span style={{ color: "#f43f5e" }}>OFFLINE</span>
+                  )}
+                </p>
                 <p>Last Sync: {timeStr}</p>
               </div>
             </div>
@@ -406,12 +584,19 @@ export default function GasDashboard() {
 
   return (
     <>
-      <NavigationMenu currentPage={currentPage} onPageChange={setCurrentPage} />
+      <NavigationMenu
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+      />
       <div className="dashboard">{renderPage()}</div>
       <AlertPopup type={popup} close={() => setPopup(null)} />
       <div className="notifications-container">
-        {notifications.map(notif => (
-          <NotificationToast key={notif.id} message={notif.message} type={notif.type} />
+        {notifications.map((notif) => (
+          <NotificationToast
+            key={notif.id}
+            message={notif.message}
+            type={notif.type}
+          />
         ))}
       </div>
     </>
